@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const Member = require('../models/Member');
 const { calculateEndDate, calculateAmount } = require('../utils/planCalculator');
+const authCheck = require('../middleware/authCheck');
 
-// POST /api/members/register
+// POST /api/members/register - public, anyone can register
 router.post('/register', async (req, res) => {
     try {
         const { name, whatsappNumber, email, planType } = req.body;
 
-        // Basic validation
         if (!name || !whatsappNumber || !planType) {
             return res.status(400).json({ error: 'Name, WhatsApp number, and plan type are required' });
         }
@@ -18,12 +18,10 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Invalid plan type' });
         }
 
-        // Calculate dates and amount
         const startDate = new Date();
         const endDate = calculateEndDate(startDate, planType);
-        const amount = calculateAmount(planType, true); // true = new member, includes joining fee
+        const amount = calculateAmount(planType, true);
 
-        // Create member record (payment status pending for now, no payment gateway yet)
         const newMember = new Member({
             name,
             whatsappNumber,
@@ -32,7 +30,7 @@ router.post('/register', async (req, res) => {
             startDate,
             endDate,
             amountPaid: amount,
-            paymentStatus: 'pending' // will become 'success' once Razorpay is added
+            paymentStatus: 'pending'
         });
 
         const savedMember = await newMember.save();
@@ -48,8 +46,8 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// GET /api/members - list all members (for admin dashboard later)
-router.get('/', async (req, res) => {
+// GET /api/members - PROTECTED, only logged-in admin can view
+router.get('/', authCheck, async (req, res) => {
     try {
         const members = await Member.find().sort({ createdAt: -1 });
         res.json(members);
